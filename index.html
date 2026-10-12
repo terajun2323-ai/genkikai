@@ -23,18 +23,14 @@ const OA_ADD_URL = 'https://line.me/R/ti/p/@153ouqvo';
 
 const app = document.getElementById('app');
 
+let isFriend = false;
+
 async function main() {
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) { liff.login(); return; }
 
-  const { friendFlag } = await liff.getFriendship();
-  if (!friendFlag) {
-    app.innerHTML =
-      '<div class="big">公式LINEの友だち追加をお願いします</div>' +
-      '<p>追加後、もう一度QRコードを読み込んでください。</p>' +
-      '<a class="btn" href="' + OA_ADD_URL + '">友だち追加する</a>';
-    return;
-  }
+  const f = await liff.getFriendship();
+  isFriend = f.friendFlag === true;
   await checkin();
 }
 
@@ -43,7 +39,7 @@ async function checkin(phone, name) {
   const res = await fetch(GAS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ idToken: liff.getIDToken(), phone: phone, name: name }),
+    body: JSON.stringify({ idToken: liff.getIDToken(), phone: phone, name: name, isFriend: isFriend }),
   });
   const r = await res.json();
 
@@ -51,12 +47,19 @@ async function checkin(phone, name) {
     app.innerHTML = '<div class="big">✅ 受付OK</div><p>' + esc(r.name) + ' 様</p>';
   } else if (r.status === 'already') {
     app.innerHTML = '<div class="big">✅ 受付済みです</div><p>' + esc(r.name) + ' 様</p>';
+  } else if (r.status === 'need_friend') {
+    app.innerHTML =
+      '<div class="big">あと一歩です</div>' +
+      '<p>' + esc(r.name) + ' 様、ご本人確認ができました。</p>' +
+      '<p>受付を完了するには、<b>公式LINEの友だち追加</b>が必要です。<br>' +
+      '追加したあと、もう一度QRコードを読み込んでください。</p>' +
+      '<a class="btn" href="' + OA_ADD_URL + '">公式LINEを友だち追加する</a>';
   } else if (r.status === 'need_phone' || r.status === 'not_found') {
     showPhoneForm(r.status === 'not_found' ? '一致する参加者が見つかりません。もう一度ご確認ください。' : '', phone);
   } else if (r.status === 'need_name') {
     showNameForm(phone);
   } else {
-        app.innerHTML = '<div class="big">エラー</div><p>スタッフにお声がけください</p>' +
+    app.innerHTML = '<div class="big">エラー</div><p>スタッフにお声がけください</p>' +
       '<p style="font-size:14px;color:#888">' + esc(r.message || r.status) + '</p>';
   }
 }
