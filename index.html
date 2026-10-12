@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>セミナー受付</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 40px 20px; }
+    .big { font-size: 28px; font-weight: bold; margin: 20px 0; }
+    button, a.btn { display: inline-block; padding: 14px 28px; font-size: 18px;
+      background: #06c755; color: #fff; border: 0; border-radius: 8px; text-decoration: none; }
+    input { font-size: 18px; padding: 10px; width: 80%; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div id="app">読み込み中...</div>
+
+<script>
+const LIFF_ID = '2011979409-6dsnPyBw';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxX8MLW87u3p4v-OYdGwmFYMM4_Lq2cLqFk7Jjgo8iAq6KAmaVV1cDikIAAB6UxNn3isQ/exec';
+const OA_ADD_URL = 'https://line.me/R/ti/p/@153ouqvo';
+
+const app = document.getElementById('app');
+
+async function main() {
+  await liff.init({ liffId: LIFF_ID });
+  if (!liff.isLoggedIn()) { liff.login(); return; }
+
+  const { friendFlag } = await liff.getFriendship();
+  if (!friendFlag) {
+    app.innerHTML = `
+      <div class="big">公式LINEの友だち追加をお願いします</div>
+      <p>追加後、もう一度QRコードを読み込んでください。</p>
+      <a class="btn" href="${OA_ADD_URL}">友だち追加する</a>`;
+    return;
+  }
+  await checkin();
+}
+
+async function checkin(phone, name) {
+  app.textContent = '受付中...';
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ idToken: liff.getIDToken(), phone, name }),
+  });
+  const r = await res.json();
+
+  if (r.status === 'ok') {
+    app.innerHTML = `<div class="big">✅ 受付OK</div><p>${esc(r.name)} 様</p>`;
+  } else if (r.status === 'already') {
+    app.innerHTML = `<div class="big">✅ 受付済みです</div><p>${esc(r.name)} 様</p>`;
+  } else if (r.status === 'need_phone' || r.status === 'not_found') {
+    showPhoneForm(r.status === 'not_found' ? '一致する参加者が見つかりません。もう一度ご確認ください。' : '', phone);
+  } else if (r.status === 'need_name') {
+    showNameForm(phone);
+  } else {
+    app.innerHTML = `<div class="big">エラー</div><p>スタッフにお声がけください</p>`;
+  }
+}
+
+function showPhoneForm(msg, prev) {
+  app.innerHTML = `
+    <div class="big">本人確認</div>
+    <p>お申込み時の<b>電話番号の下4桁</b>を入力してください</p>
+    ${msg ? `<p style="color:red">${msg}</p>` : ''}
+    <input id="phone" inputmode="numeric" maxlength="4" placeholder="例: 7139" value="${esc(prev || '')}"><br>
+    <button onclick="checkin(document.getElementById('phone').value.trim())">受付する</button>`;
+}
+
+function showNameForm(phone) {
+  app.innerHTML = `
+    <div class="big">お名前の入力</div>
+    <p>同じ下4桁の方がいるため、<b>お申込み時のお名前</b>も入力してください</p>
+    <input id="nm" placeholder="例: 山田 太郎"><br>
+    <button onclick="checkin('${esc(phone)}', document.getElementById('nm').value.trim())">受付する</button>`;
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g,
+    c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+main().catch(e => { app.textContent = 'エラー: ' + e.message; });
+</script>
+
+async function checkin(participantId) {
+  app.textContent = '受付中...';
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // CORSのプリフライト回避
+    body: JSON.stringify({ idToken: liff.getIDToken(), participantId }),
+  });
+  const r = await res.json();
+
+  if (r.status === 'ok') {
+    app.innerHTML = `<div class="big">✅ 受付OK</div><p>${r.name} 様</p>`;
+  } else if (r.status === 'already') {
+    app.innerHTML = `<div class="big">✅ 受付済みです</div><p>${r.name} 様</p>`;
+  } else if (r.status === 'need_id' || r.status === 'invalid_id') {
+    const msg = r.status === 'invalid_id' ? '<p style="color:red">IDが見つかりません</p>' : '';
+    app.innerHTML = `
+      <div class="big">参加者IDを入力してください</div>${msg}
+      <input id="pid" placeholder="参加者ID"><br>
+      <button onclick="checkin(document.getElementById('pid').value.trim())">受付する</button>`;
+  } else {
+    app.innerHTML = `<div class="big">エラー</div><p>スタッフにお声がけください</p>`;
+  }
+}
+
+main().catch(e => { app.textContent = 'エラー: ' + e.message; });
+</script>
+</body>
+</html>
