@@ -18,11 +18,12 @@
 
 <script>
 const LIFF_ID = '2011979409-6dsnPyBw';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxX8MLW87u3p4v-OYdGwmFYMM4_Lq2cLqFk7Jjgo8iAq6KAmaVV1cDikIAAB6UxNn3isQ/exec';
+const GAS_URL = 'ここに/execで終わるGASのURL';
 const OA_ADD_URL = 'https://line.me/R/ti/p/@153ouqvo';
+const OA_CHAT_URL = 'https://line.me/R/oaMessage/@153ouqvo/?' + encodeURIComponent('セミナー受付で参加者名簿に見つかりませんでした');
+const FORM_URL = ''; // 申込みフォームのURL(無ければ空のまま)
 
 const app = document.getElementById('app');
-
 let isFriend = false;
 
 async function main() {
@@ -43,10 +44,14 @@ async function checkin(phone, name) {
   });
   const r = await res.json();
 
+  const minorMsg = r.minor
+    ? '<p style="background:#fff3cd;border:1px solid #e0c060;border-radius:8px;padding:12px;font-weight:bold;">20歳未満の方は、受付スタッフにお声がけください</p>'
+    : '';
+
   if (r.status === 'ok') {
-    app.innerHTML = '<div class="big">✅ 受付OK</div><p>' + esc(r.name) + ' 様</p>';
+    app.innerHTML = '<div class="big">✅ 受付OK</div><p>' + esc(r.name) + ' 様</p>' + minorMsg;
   } else if (r.status === 'already') {
-    app.innerHTML = '<div class="big">✅ 受付済みです</div><p>' + esc(r.name) + ' 様</p>';
+    app.innerHTML = '<div class="big">✅ 受付済みです</div><p>' + esc(r.name) + ' 様</p>' + minorMsg;
   } else if (r.status === 'need_friend') {
     app.innerHTML =
       '<div class="big">あと一歩です</div>' +
@@ -55,7 +60,7 @@ async function checkin(phone, name) {
       '追加したあと、もう一度QRコードを読み込んでください。</p>' +
       '<a class="btn" href="' + OA_ADD_URL + '">公式LINEを友だち追加する</a>';
   } else if (r.status === 'need_phone' || r.status === 'not_found') {
-    showPhoneForm(r.status === 'not_found' ? '一致する参加者が見つかりません。もう一度ご確認ください。' : '', phone);
+    showPhoneForm(r.status === 'not_found' ? 'notfound' : '', phone);
   } else if (r.status === 'need_name') {
     showNameForm(phone);
   } else {
@@ -65,10 +70,22 @@ async function checkin(phone, name) {
 }
 
 function showPhoneForm(msg, prev) {
+  let notFound = '';
+  if (msg) {
+    notFound =
+      '<div style="background:#fff3f3;border:1px solid #f5c2c2;border-radius:8px;padding:14px;margin:12px 0;">' +
+      '<p style="color:#c00;font-weight:bold;margin:0 0 8px;">参加者名簿に見つかりませんでした</p>' +
+      '<p style="margin:0 0 12px;font-size:14px;">電話番号の下4桁をご確認のうえ、もう一度入力してください。<br>' +
+      'お申込みがお済みでない場合は、下のボタンからご連絡ください。</p>' +
+      '<a class="btn" style="font-size:15px;padding:10px 20px;" href="' + OA_CHAT_URL + '">公式LINEで連絡する</a>' +
+      (FORM_URL ? '<p style="margin:12px 0 0;"><a href="' + FORM_URL + '">申込みフォームはこちら</a></p>' : '') +
+      '</div>';
+  }
+
   app.innerHTML =
     '<div class="big">本人確認</div>' +
     '<p>お申込み時の<b>電話番号の下4桁</b>を入力してください</p>' +
-    (msg ? '<p style="color:red">' + msg + '</p>' : '') +
+    notFound +
     '<input id="phone" inputmode="numeric" maxlength="4" placeholder="例: 7139" value="' + esc(prev || '') + '"><br>' +
     '<button id="goPhone">受付する</button>';
   document.getElementById('goPhone').onclick = function () {
