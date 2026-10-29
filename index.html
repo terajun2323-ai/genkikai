@@ -10,6 +10,8 @@
     .big { font-size: 28px; font-weight: bold; margin: 20px 0; }
     button, a.btn { display: inline-block; padding: 14px 28px; font-size: 18px;
       background: #06c755; color: #fff; border: 0; border-radius: 8px; text-decoration: none; }
+    button.sub { background: #888; }
+    .row { display: flex; gap: 12px; justify-content: center; margin-top: 16px; }
     input { font-size: 18px; padding: 10px; width: 80%; margin-bottom: 12px; }
   </style>
 </head>
@@ -35,23 +37,31 @@ async function main() {
   await checkin();
 }
 
-async function checkin(phone, name) {
+async function checkin(phone, name, minor) {
   app.textContent = '受付中...';
   const res = await fetch(GAS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ idToken: liff.getIDToken(), phone: phone, name: name, isFriend: isFriend }),
+    body: JSON.stringify({
+      idToken: liff.getIDToken(),
+      phone: phone,
+      name: name,
+      minor: minor,
+      isFriend: isFriend
+    }),
   });
   const r = await res.json();
 
   const minorMsg = r.minor
-    ? '<p style="background:#fff3cd;border:1px solid #e0c060;border-radius:8px;padding:12px;font-weight:bold;">20歳未満の方は、受付スタッフにお声がけください</p>'
+    ? '<p style="background:#fff3cd;border:1px solid #e0c060;border-radius:8px;padding:12px;font-weight:bold;">未成年の方は、受付スタッフにお声がけください</p>'
     : '';
 
   if (r.status === 'ok') {
     app.innerHTML = '<div class="big">✅ 受付OK</div><p>' + esc(r.name) + ' 様</p>' + minorMsg;
   } else if (r.status === 'already') {
     app.innerHTML = '<div class="big">✅ 受付済みです</div><p>' + esc(r.name) + ' 様</p>' + minorMsg;
+  } else if (r.status === 'need_minor') {
+    showMinorForm(r.name);
   } else if (r.status === 'need_friend') {
     app.innerHTML =
       '<div class="big">あと一歩です</div>' +
@@ -67,6 +77,19 @@ async function checkin(phone, name) {
     app.innerHTML = '<div class="big">エラー</div><p>スタッフにお声がけください</p>' +
       '<p style="font-size:14px;color:#888">' + esc(r.message || r.status) + '</p>';
   }
+}
+
+function showMinorForm(userName) {
+  app.innerHTML =
+    '<div class="big">年齢の確認</div>' +
+    '<p>' + esc(userName) + ' 様</p>' +
+    '<p style="font-size:20px;font-weight:bold;">あなたは未成年(20歳未満)ですか？</p>' +
+    '<div class="row">' +
+    '<button id="minorYes">はい</button>' +
+    '<button id="minorNo" class="sub">いいえ</button>' +
+    '</div>';
+  document.getElementById('minorYes').onclick = function () { checkin(undefined, undefined, 'yes'); };
+  document.getElementById('minorNo').onclick = function () { checkin(undefined, undefined, 'no'); };
 }
 
 function showPhoneForm(msg, prev) {
